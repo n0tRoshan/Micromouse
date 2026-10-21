@@ -6,12 +6,12 @@ The whole mouse is generated from one parameter file. Change a number, rebuild, 
 |---|---|
 | `source/params.py` | Every dimension, tagged confirmed `[C]`, assumed `[A]` or design choice `[D]`. Edit here |
 | `source/micromouse.py` | Part geometry |
-| `source/build.py` | Runs the 16 design checks, exports STEP/STL/DXF, renders views into `../assets/`, writes `build_report.md` |
+| `source/build.py` | Runs the 22 design checks, exports STEP/STL/DXF, renders views into `../assets/`, writes `build_report.md` |
 | `source/render.py` | Headless renderer for the images |
 | `step/micromouse_revA_assembly.step` | **Full assembly: open this in Fusion 360** |
 | `step/*.step` | One STEP per part; `plate_outline.dxf` for the KiCad board outline |
 | `stl/` | Printable parts: frame, hubs, impeller, sensor block, battery holder, bumper (plate STL is for fit checks) |
-| `build_report.md` | Generated: check results, mass and CG table, fan, grip, IR geometry, clearances |
+| `build_report.md` | Generated: check results, mass and CG table, fan, grip, IR geometry, diagonal clearance, crash loads, clearances |
 
 ## Open in Fusion 360
 
@@ -20,7 +20,7 @@ File > Open > Open from my computer > `step/micromouse_revA_assembly.step`. It l
 ## Rebuild
 
 ```bash
-python3 -m pip install cadquery matplotlib
+python3 -m pip install cadquery matplotlib shapely
 cd cad_design/source && python3 build.py   # exit code 0 only when every check passes
 ```
 
@@ -36,7 +36,8 @@ cd cad_design/source && python3 build.py   # exit code 0 only when every check p
 | impeller | printed PETG / resin | 1 |
 | hub | printed PETG | 2 |
 | 8520 coreless motor, 8T 0.5M pinion, 36T 0.5M spur | bought | 2 each |
-| 3 mm steel axle, MR63ZZ bearing | bought | 2, 4 |
+| 3 mm stainless axle (D-flat, M2 tapped end), MR63ZZ bearing | bought, machined | 2, 4 |
+| spacer + 0.3 mm shim + e-clip (axle_hw), M2 x 4 hub screw + washer | bought | 2 sets, 2 |
 | 4 x 2 mm diametric magnet, AS5047P board | bought | 2 each |
 | 0716 coreless fan motor | bought | 1 |
 | SFH4550 emitter, TEFT4300 receiver | bought | 4 each |

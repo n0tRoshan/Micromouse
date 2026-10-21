@@ -5,83 +5,93 @@
 | Check | Result | Value |
 |---|---|---|
 | No unplanned part interference | PASS | none |
-| Footprint within 250 x 250 mm | PASS | 96.5 x 77.0 mm |
-| Width leaves ≥ 30 mm per side in the 168 mm passage | PASS | 45.5 mm per side |
-| Turn in place fits a cell (swept radius ≤ 84 - 10 mm) | PASS | swept radius 61.1 mm |
-| Mass excl. battery < 100 g (Phase 2 start target) | PASS | 63.3 g (total 78.3 g) |
-| CG ahead of axle by 0-6 mm (nose rests on front skid) | PASS | x = +0.8 mm |
+| Footprint within 250 x 250 mm | PASS | 96.5 x 74.0 mm |
+| Width leaves ≥ 30 mm per side in the 168 mm passage | PASS | 47.0 mm per side |
+| Turn in place fits a cell (swept radius ≤ 84 - 10 mm) | PASS | swept radius 60.4 mm |
+| Mass excl. battery < 100 g (Phase 2 start target) | PASS | 62.7 g (total 77.7 g) |
+| CG ahead of axle by 0-6 mm (nose rests on front skid) | PASS | x = +0.6 mm |
 | CG centred laterally (|y| ≤ 1 mm) | PASS | y = -0.04 mm |
-| CG low (z ≤ wheel diameter) | PASS | z = 16.2 mm |
-| Braking grip limit ≥ 4 m/s² target, fan off | PASS | 6.8 m/s² (fan on, 150 gf [A]: 19.2 m/s²) |
+| CG low (z ≤ wheel diameter) | PASS | z = 16.1 mm |
+| Braking grip limit ≥ 4 m/s² target, fan off | PASS | 6.9 m/s² (fan on, 150 gf [A]: 19.4 m/s²) |
 | Fan downforce acts within 10 mm of the axle (loads the wheels, not the skids) | PASS | skirt centroid x = +2.9 mm |
 | Skirt clears the floor by > 0.5 mm step at both pitch extremes | PASS | nose down 0.99 mm, tail down 0.66 mm |
 | Body ground clearance ≥ 3 mm above the skirt line (floor steps ≤ 0.5 mm) | PASS | min 7.0 mm |
 | Spur gear tips ≥ 2 mm off the floor | PASS | 2.5 mm |
 | Rear skid gap > 0.5 mm floor step rule | PASS | 0.6 mm |
 | Tyre clears every body part by ≥ 0.8 mm | PASS | closest tire_R to plate: 2.12 mm |
+| Diagonal straight: ≥ 5 mm to every post with ±5 mm and ±5° error | PASS | 10.0 mm worst, 18.2 mm centred (corridor 110.3 mm) |
+| 45° turn in and out clears by ≥ 5 mm with errors, every radius checked | PASS | R45: 10.0, R60: 10.0, R75: 10.0, R90: 10.0, R110: 10.0 |
+| V90 turn clears by ≥ 5 mm with errors at R = 50 mm | PASS | passes at R = 40, 50, 60, 75 mm; keep firmware V90 radius ≤ 75 mm |
+| Diagonal IR (DL, DR) sees a wall or post within 180 mm [A] over ≥ 80 % of a diagonal | PASS | DL 33-195 mm, 89% in range, DR 31-195 mm, 89% in range |
+| Frontal crash at the stretch speed: 4 frame screws hold with ≥ 2x margin | PASS | 2.0 m/s: 155 N mean, margin 22.4x |
+| Axle deflection at the tyre under a 10 g shock < 20 µm | PASS | 1.1 µm, 26 MPa |
 | All IR spots stay on the wall face (0-50 mm) | PASS | FL 15-28, FR 15-28, DL 9-34, DR 9-34 |
 
 ## Key dimensions
 
-- Overall 96.5 (L) x 77.0 (W) x 29.5 (H) mm; track 66.3 mm; wheel Ø24 mm
+- Overall 96.5 (L) x 74.0 (W) x 29.5 (H) mm; track 66.3 mm; wheel Ø24 mm
 - Plate (PCB) underside z = 17.5 mm; IR beam z = 21.3 mm
 
 ## Mass and CG (origin: floor under axle centre; x fwd, y left, z up)
 
 | Part | Material | Mass g | CG x | CG y | CG z |
 |---|---|---|---|---|---|
-| frame | PETG, printed (one piece) | 11.34 | -2.0 | 0.0 | 6.7 |
-| plate | FR4 1.0 mm PCB (chassis) | 11.52 | 7.5 | -0.0 | 18.0 |
+| frame | PETG, printed (one piece) | 11.33 | -2.0 | 0.0 | 6.7 |
+| plate | FR4 1.0 mm PCB (chassis) | 11.00 | 7.7 | 0.0 | 18.0 |
 | motor_L | 8520 coreless | 5.00 | -11.0 | 14.0 | 12.0 |
 | pinion_L | 8T 0.5M brass | 0.15 | -11.0 | 28.3 | 12.0 |
 | spur_L | 36T 0.5M nylon | 0.40 | -0.0 | 28.3 | 12.0 |
 | bearings_L | 2 x MR63ZZ | 0.60 | 0.0 | 24.5 | 12.0 |
-| axle_L | 3 mm steel shaft | 0.94 | -0.0 | 28.5 | 12.0 |
-| hub_L | PETG, printed | 2.43 | -0.0 | 33.1 | 12.0 |
+| axle_L | 3 mm stainless shaft | 0.75 | -0.0 | 26.1 | 11.9 |
+| axle_hw_L | spacer, shim, e-clip | 0.15 | -0.0 | 21.0 | 12.0 |
+| hub_screw_L | M2 x 4 screw + washer | 0.20 | 0.0 | 35.0 | 12.0 |
+| hub_L | PETG, printed | 2.40 | 0.0 | 33.1 | 12.0 |
 | tire_L | silicone/PU tyre | 0.60 | 0.0 | 33.2 | 12.0 |
-| magnet_L | 4x2 diametric magnet | 0.20 | -0.0 | 19.0 | 12.0 |
-| encoder_L | AS5047P breakout | 0.40 | 0.0 | 15.8 | 12.0 |
+| magnet_L | 4x2 diametric magnet | 0.20 | -0.0 | 18.0 | 12.0 |
+| encoder_L | AS5047P breakout | 0.40 | 0.0 | 14.8 | 12.0 |
 | motor_R | 8520 coreless | 5.00 | -11.0 | -14.0 | 12.0 |
 | pinion_R | 8T 0.5M brass | 0.15 | -11.0 | -28.3 | 12.0 |
 | spur_R | 36T 0.5M nylon | 0.40 | -0.0 | -28.3 | 12.0 |
 | bearings_R | 2 x MR63ZZ | 0.60 | 0.0 | -24.5 | 12.0 |
-| axle_R | 3 mm steel shaft | 0.94 | -0.0 | -28.5 | 12.0 |
-| hub_R | PETG, printed | 2.43 | -0.0 | -33.1 | 12.0 |
+| axle_R | 3 mm stainless shaft | 0.75 | -0.0 | -26.1 | 11.9 |
+| axle_hw_R | spacer, shim, e-clip | 0.15 | -0.0 | -21.0 | 12.0 |
+| hub_screw_R | M2 x 4 screw + washer | 0.20 | 0.0 | -35.0 | 12.0 |
+| hub_R | PETG, printed | 2.40 | 0.0 | -33.1 | 12.0 |
 | tire_R | silicone/PU tyre | 0.60 | 0.0 | -33.2 | 12.0 |
-| magnet_R | 4x2 diametric magnet | 0.20 | -0.0 | -19.0 | 12.0 |
-| encoder_R | AS5047P breakout | 0.40 | 0.0 | -15.8 | 12.0 |
+| magnet_R | 4x2 diametric magnet | 0.20 | -0.0 | -18.0 | 12.0 |
+| encoder_R | AS5047P breakout | 0.40 | 0.0 | -14.8 | 12.0 |
 | impeller | PETG/resin, printed | 0.52 | 7.0 | -0.0 | 5.8 |
 | fan_motor | 0716 coreless | 2.50 | 7.0 | -0.0 | 17.2 |
-| sensor_block | black PETG, printed | 5.99 | 41.8 | 0.0 | 21.8 |
+| sensor_block | black PETG, printed | 5.62 | 41.9 | 0.0 | 21.8 |
 | ir_emitters | SFH4550 x4 | 1.00 | 42.4 | -1.9 | 21.3 |
 | ir_receivers | TEFT4300 x4 | 1.00 | 42.4 | 1.9 | 21.3 |
 | battery_holder | PETG, printed | 0.82 | -18.1 | -3.4 | 20.8 |
 | battery | 2S LiPo | 15.00 | -18.0 | -0.0 | 24.0 |
-| bumper | TPU 95A, printed | 0.56 | 47.5 | 0.0 | 14.0 |
+| bumper | TPU 95A, printed | 0.55 | 47.3 | 0.0 | 14.0 |
 | mcu | IC on PCB | 0.50 | 26.0 | 0.0 | 19.3 |
 | imu | IC on PCB | 0.05 | 0.0 | 0.0 | 19.0 |
 | motor_driver | IC on PCB | 0.05 | -3.0 | 10.0 | 19.0 |
 | fan_mosfet | IC on PCB | 0.05 | -3.0 | -10.0 | 19.0 |
 | PCB passives, regulator, connectors | lumped [A] | 3.00 | 0.0 | 0.0 | 18.5 |
 | wiring, screws, inserts | lumped [A] | 3.00 | 0.0 | 0.0 | 18.5 |
-| **Total** | | **78.3** | **+0.8** | **-0.04** | **16.2** |
+| **Total** | | **77.7** | **+0.6** | **-0.04** | **16.1** |
 
 Masses of bought parts and the 85 % print fill are [A] until weighed (Phase 6A).
 
 ## Pitch and grip, fan on (quasi-static, tyre μ = 1.0 [A])
 
 - Rests on: front skid
-- Nose lifts onto the rear skid above 3.8 m/s² forward acceleration (harmless, 2-skid rocking)
-- Braking grip limit with load transfer to the front skid: 19.2 m/s²
-- Acceleration grip limit on the rear skid: 20.6 m/s²
+- Nose lifts onto the rear skid above 3.7 m/s² forward acceleration (harmless, 2-skid rocking)
+- Braking grip limit with load transfer to the front skid: 19.4 m/s²
+- Acceleration grip limit on the rear skid: 20.7 m/s²
 - Total pitch range between skids: 0.70°, moves an IR spot 1.2 mm at 100 mm
 
 ## Suction fan
 
 - 0716 coreless [A] driving a 20 mm, 8-blade centrifugal impeller at x = 7 mm
 - Skirt (suction pan) area 3774 mm², centroid x = +2.9 mm, 1.3 mm off the floor
-- Design downforce 150 gf [A] = 1.92x robot weight; needs 390 Pa under the pan
-- Grip with fan: braking 19.2 m/s², accelerating 20.6 m/s² (fan off: 6.8 / 6.8)
+- Design downforce 150 gf [A] = 1.93x robot weight; needs 390 Pa under the pan
+- Grip with fan: braking 19.4 m/s², accelerating 20.7 m/s² (fan off: 6.9 / 6.8)
 - Fan current 0.6 A [A], needs its own low-side MOSFET channel (the dual H-bridge is used by the wheels)
 
 ## IR geometry (mouse centred in a cell, walls on three sides)
@@ -93,6 +103,41 @@ Masses of bought parts and the 85 % print fill are [A] until weighed (Phase 6A).
 | DL | 46.5, 31.5 | +50° | front wall at x=84 | 58.3 | 8.9 to 33.7 | 68.5 mm, at x=91 (posts at x=±90) |
 | DR | 46.5, -31.5 | -50° | front wall at x=84 | 58.3 | 8.9 to 33.7 | 68.5 mm, at x=91 (posts at x=±90) |
 
+## Diagonal running (Rev A.1)
+
+- Corridor between post corners on a 45° staircase: 110.3 mm (= 2 x (180/2 - 12)/√2, from the APEC cell and post sizes)
+- Mouse width across the corridor: 74.0 mm square-on, 78.1 mm at 5° heading error
+- Clearance on a diagonal straight: 18.2 mm per side centred; 10.0 mm with ±5 mm and ±5° [A] applied together
+
+| Manoeuvre | Radius mm | Clearance centred mm | Clearance with errors mm |
+|---|---|---|---|
+| 45° in / out | 45 | 18.2 | 10.0 |
+| 45° in / out | 60 | 18.2 | 10.0 |
+| 45° in / out | 75 | 18.2 | 10.0 |
+| 45° in / out | 90 | 18.2 | 10.0 |
+| 45° in / out | 110 | 18.2 | 10.0 |
+| V90 (diagonal to diagonal) | 40 | 18.2 | 10.0 |
+| V90 (diagonal to diagonal) | 50 | 18.2 | 10.0 |
+| V90 (diagonal to diagonal) | 60 | 18.2 | 10.0 |
+| V90 (diagonal to diagonal) | 75 | 15.1 | 9.9 |
+| V90 (diagonal to diagonal) | 90 | 9.3 | 4.0 |
+
+IR on a diagonal straight (distance to the first wall or post over one 180 mm period):
+
+- FL: looks along the corridor, no wall within 400 mm until the diagonal ends (used for the end wall)
+- FR: looks along the corridor, no wall within 400 mm until the diagonal ends (used for the end wall)
+- DL: 33 to 195 mm, within 180 mm for 89% of the period
+- DR: 31 to 195 mm, within 180 mm for 89% of the period
+
+## Crash and stiffness (Rev A.1)
+
+| Speed m/s | Energy J | Mean bumper force N | 4 x M2 shear margin |
+|---|---|---|---|
+| 1.0 | 0.039 | 39 | 89.6x |
+| 2.0 | 0.155 | 155 | 22.4x |
+
+Bumper stroke 1.0 mm [A]. Axle: 6.1 mm overhang from the outer bearing to the tyre centre, 11.2 N per wheel at 10 g [A] with the fan on: deflection 1.1 µm, bending stress 26 MPa (stainless yield ≈ 200+ MPa).
+
 ## Interference check
 
 No overlapping solids.
@@ -101,11 +146,11 @@ No overlapping solids.
 
 - tire_L to plate: 2.12 mm
 - tire_L to frame: 3.15 mm
-- tire_L to bumper: 13.03 mm
+- tire_L to bumper: 13.00 mm
 - tire_L to sensor_block: 16.02 mm
 - tire_L to battery_holder: 4.62 mm
 - tire_R to plate: 2.12 mm
 - tire_R to frame: 3.15 mm
-- tire_R to bumper: 13.03 mm
+- tire_R to bumper: 13.00 mm
 - tire_R to sensor_block: 16.02 mm
 - tire_R to battery_holder: 4.62 mm

@@ -27,7 +27,8 @@ MOTOR_X = -CENTRE_DIST if P.MOTOR_BEHIND else CENTRE_DIST
 MOTOR_Y1 = WALL_Y0 + 2.0                       # motor face sits 2 mm into the wall pocket
 MOTOR_Y0 = MOTOR_Y1 - P.MOTOR_LEN
 TUBE_R = P.MOTOR_D / 2 + P.MOTOR_FIT + P.MOTOR_TUBE_WALL
-AXLE_Y0 = WALL_Y0 - 2.0                        # axle sticks 2 mm inboard for the magnet
+AXLE_Y0 = WALL_Y0 - P.AXLE_STICK               # axle sticks out inboard for the spacer, e-clip and magnet
+AXLE_Y1 = HUB_Y1 - P.HUB_CB[1] - P.AXLE_END_RECESS   # axle end, just below the hub counterbore floor
 MAG_Y0 = AXLE_Y0 - P.MAGNET[1]
 ENC_CHIP_T = 0.9
 ENC_CHIP_Y1 = MAG_Y0 - P.ENC_AIR_GAP
@@ -105,8 +106,37 @@ def spur():
     return _ycyl(2 * SPUR_R, GEAR_Y0, GEAR_Y1).cut(_ycyl(P.AXLE_D, GEAR_Y0 - 1, GEAR_Y1 + 1))
 
 
+def _d_shaft(d, y0, y1, flat):
+    """Round shaft along +y with a flat on top (D profile)."""
+    return _ycyl(d, y0, y1).cut(_box(-d, d, y0 - 1, y1 + 1, AXLE_Z + d / 2 - flat, AXLE_Z + d))
+
+
 def axle():
-    return _ycyl(P.AXLE_D, AXLE_Y0, HUB_Y1)
+    """3 mm shaft: D-flat under the hub, M2 tapped hole in the outer end, e-clip groove at the inner end."""
+    a = _ycyl(P.AXLE_D, AXLE_Y0, HUB_Y0).union(_d_shaft(P.AXLE_D, HUB_Y0, AXLE_Y1, P.AXLE_FLAT))
+    a = a.cut(_ycyl(2.0, AXLE_Y1 - 4.0, AXLE_Y1 + 1))                       # M2 thread, modelled at 2.0
+    gy = WALL_Y0 - P.SPACER[2]
+    return a.cut(_ycyl(P.AXLE_D + 1, gy - P.ECLIP[1], gy).cut(_ycyl(2.3, gy - 1, gy + 1)))   # groove to 2.3
+
+
+def axle_hw():
+    """Inner spacer + e-clip (clamp the inner races from inside) and the outer shim (from outside)."""
+    sid, sod, sl = P.SPACER
+    sp = _ycyl(sod, WALL_Y0 - sl, WALL_Y0).cut(_ycyl(sid, WALL_Y0 - sl - 1, WALL_Y0 + 1))
+    gy = WALL_Y0 - sl
+    clip = _ycyl(P.ECLIP[0], gy - P.ECLIP[1], gy).cut(_ycyl(2.3, gy - 1, gy + 1))
+    hid, hod, ht = P.SHIM
+    shim = _ycyl(hod, WALL_Y1, WALL_Y1 + ht).cut(_ycyl(hid, WALL_Y1 - 1, WALL_Y1 + 1))
+    return sp.union(clip).union(shim)
+
+
+def hub_screw():
+    """M2 x 4 screw and M2 washer in the hub counterbore, threaded into the axle end."""
+    y0 = HUB_Y1 - P.HUB_CB[1]
+    washer = _ycyl(5.0, y0, y0 + 0.3).cut(_ycyl(2.2, y0 - 1, y0 + 1))
+    head = _ycyl(3.8, y0 + 0.3, y0 + 1.6)
+    shank = _ycyl(2.0, AXLE_Y1 - 3.5, y0 + 0.3)
+    return washer.union(head).union(shank)
 
 
 def bearings():
@@ -125,7 +155,8 @@ def hub():
     h = _ycyl(core_d, HUB_Y0, HUB_Y1)
     h = h.union(_ycyl(core_d + 2 * P.LIP_H, HUB_Y0, y0))
     h = h.union(_ycyl(core_d + 2 * P.LIP_H, y0 + P.TIRE_W, HUB_Y1))
-    h = h.cut(_ycyl(P.AXLE_D, HUB_Y0 - 1, HUB_Y1 + 1))
+    h = h.cut(_d_shaft(P.AXLE_D + 0.05, HUB_Y0 - 1, HUB_Y1 + 1, P.AXLE_FLAT))   # D bore drives the wheel
+    h = h.cut(_ycyl(P.HUB_CB[0], HUB_Y1 - P.HUB_CB[1], HUB_Y1 + 1))               # washer + screw head
     for k in range(5):                                   # lightening holes
         a = 2 * math.pi * k / 5
         r = 5.6
@@ -251,6 +282,12 @@ def plate():
     holes += sensor_block_holes() + holder_holes()
     for (x, y) in holes:
         p = p.cut(_zcyl(2.3, PLATE_Z0 - 1, PLATE_Z1 + 1, x=x, y=y))
+    # wire pass-throughs: encoder leads straight up from each board, motor leads up behind the battery
+    sx, sy = P.ENC_SLOT
+    ey = (ENC_BOARD_Y0 + ENC_CHIP_Y1) / 2
+    p = p.cut(_both(_box(-sx / 2, sx / 2, ey - sy / 2, ey + sy / 2, PLATE_Z0 - 1, PLATE_Z1 + 1).edges("|Z").fillet(1.0)))
+    mx, my, mcx = P.MOTOR_SLOT
+    p = p.cut(_box(mcx - mx / 2, mcx + mx / 2, -my / 2, my / 2, PLATE_Z0 - 1, PLATE_Z1 + 1).edges("|Z").fillet(1.0))
     return p.cut(_zcyl(P.FAN_MOTOR_D + 0.4, PLATE_Z0 - 1, PLATE_Z1 + 1, x=P.FAN_CENTER_X))
 
 
@@ -349,7 +386,11 @@ def build_parts():
             Part(f"pinion_{side}", m(pinion()), brass, "8T 0.5M brass", mass=0.15, explode=(0, s * 40, 0)),
             Part(f"spur_{side}", m(spur()), (0.95, 0.95, 0.95), "36T 0.5M nylon", mass=0.4, explode=(0, s * 48, 0)),
             Part(f"bearings_{side}", m(bearings()), steel, "2 x MR63ZZ", mass=2 * P.BEARING_MASS, explode=(0, s * 33, 0)),
-            Part(f"axle_{side}", m(axle()), steel, "3 mm steel shaft", density=7.85, explode=(0, s * 62, 0)),
+            Part(f"axle_{side}", m(axle()), steel, "3 mm stainless shaft", density=7.9, explode=(0, s * 62, 0)),
+            Part(f"axle_hw_{side}", m(axle_hw()), steel, "spacer, shim, e-clip", mass=P.AXLE_HW_MASS,
+                 explode=(0, s * 18, -12)),
+            Part(f"hub_screw_{side}", m(hub_screw()), (0.2, 0.2, 0.22), "M2 x 4 screw + washer",
+                 mass=P.HUB_SCREW_MASS, explode=(0, s * 76, 0)),
             Part(f"hub_{side}", m(hub()), (0.95, 0.95, 0.95), "PETG, printed", density=P.PETG_DENSITY,
                  printable=True, explode=(0, s * 56, 0)),
             Part(f"tire_{side}", m(tire()), (0.12, 0.12, 0.12), "silicone/PU tyre", mass=0.6, explode=(0, s * 66, 0)),

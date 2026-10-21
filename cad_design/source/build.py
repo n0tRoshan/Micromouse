@@ -11,6 +11,10 @@ import numpy as np
 import cadquery as cq
 from OCP.BRepExtrema import BRepExtrema_DistShapeShape
 
+from shapely import affinity
+from shapely.geometry import LineString, MultiPoint, Point, box as sbox
+from shapely.ops import unary_union
+
 import params as P
 import micromouse as M
 import render as R
@@ -122,6 +126,153 @@ def dynamics(m_g, cg, fan_g=0.0):
     return res
 
 
+# ------------------------------------------------------------ diagonal running (Rev A.1)
+def footprint(parts):
+    """Top-view convex hull of the whole mouse (robot frame, origin under the axle centre)."""
+    pts = np.vstack([R.tessellate(p.shape, 0.3, max_edge=0)[0][:, :2] for p in parts])
+    return MultiPoint([tuple(q) for q in pts]).convex_hull
+
+
+def fillet_path(wps, radius, step=2.0):
+    """Axle-centre poses (x, y, heading) along a polyline whose corners are rounded with arcs of `radius`."""
+    wps = [np.array(w, float) for w in wps]
+    segs, start = [], wps[0]
+    for i in range(1, len(wps) - 1):
+        a, b, c = wps[i - 1], wps[i], wps[i + 1]
+        u = (b - a) / np.linalg.norm(b - a); v = (c - b) / np.linalg.norm(c - b)
+        turn = math.atan2(u[0] * v[1] - u[1] * v[0], u @ v)
+        d = radius * math.tan(abs(turn) / 2)
+        p1 = b - u * d
+        n = np.array([-u[1], u[0]]) * math.copysign(1, turn)
+        segs += [("L", start, p1), ("A", p1 + n * radius, math.atan2(u[1], u[0]), turn)]
+        start = b + v * d
+    segs.append(("L", start, wps[-1]))
+    poses = []
+    for sg in segs:
+        if sg[0] == "L":
+            a, b = sg[1], sg[2]; L = np.linalg.norm(b - a); h = math.atan2(b[1] - a[1], b[0] - a[0])
+            poses += [(*(a + (b - a) * t / L), h) for t in np.arange(0, L, step)]
+        else:
+            _, ctr, h0, turn = sg
+            n = max(2, int(abs(turn) * radius / step))
+            for k in range(n + 1):
+                h = h0 + turn * k / n
+                ang = h - math.copysign(math.pi / 2, turn)
+                poses.append((ctr[0] + radius * math.cos(ang), ctr[1] + radius * math.sin(ang), h))
+    return poses
+
+
+def maze_for(wps):
+    """Walls and posts around the cells the polyline visits: every wall is closed except the ones it crosses."""
+    C, T = P.CELL, P.WALL_T
+    cells = []
+    for a, b in zip(wps[:-1], wps[1:]):
+        a, b = np.array(a, float), np.array(b, float)
+        for t in np.linspace(0, 1, 600):
+            q = a + (b - a) * t
+            fx, fy = (q[0] / C) % 1, (q[1] / C) % 1
+            if min(fx, 1 - fx) < 1e-6 or min(fy, 1 - fy) < 1e-6:
+                continue
+            c = (math.floor(q[0] / C), math.floor(q[1] / C))
+            if not cells or cells[-1] != c:
+                cells.append(c)
+    opening = {frozenset(p) for p in zip(cells[:-1], cells[1:])}
+    obs = []
+    xs = [c[0] for c in cells]; ys = [c[1] for c in cells]
+    for i in range(min(xs) - 1, max(xs) + 3):
+        for j in range(min(ys) - 1, max(ys) + 3):
+            obs.append(sbox(i * C - T / 2, j * C - T / 2, i * C + T / 2, j * C + T / 2))
+    for k, (i, j) in enumerate(cells):
+        for di, dj in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            if frozenset(((i, j), (i + di, j + dj))) in opening:
+                continue
+            if (k == 0 and (di, dj) == (-1, 0)) or (k == len(cells) - 1 and (di, dj) == (1, 0)):
+                continue                                   # run-in and run-out stay open
+            x0, y0 = (i + (di == 1)) * C, (j + (dj == 1)) * C
+            obs.append(sbox(x0 - T / 2, j * C, x0 + T / 2, (j + 1) * C) if di else
+                       sbox(i * C, y0 - T / 2, (i + 1) * C, y0 + T / 2))
+    return unary_union(obs)
+
+
+def clearance(hull, poses, obs, dlat=0.0, dhead=0.0):
+    m = 1e9
+    for (x, y, h) in poses:
+        g = affinity.rotate(hull, h + math.radians(dhead), origin=(0, 0), use_radians=True)
+        g = affinity.translate(g, x - math.sin(h) * dlat, y + math.cos(h) * dlat)
+        m = min(m, g.distance(obs))
+    return m
+
+
+def worst_clearance(hull, poses, obs):
+    e, h = P.DIAG_LATERAL_ERR, P.DIAG_HEADING_ERR
+    return min(clearance(hull, poses, obs, a, b) for a in (-e, e) for b in (-h, h))
+
+
+DIAG_STRAIGHT = [(-270, 90), (180, 90), (900, 810), (1350, 810)]   # straight, 45° in, 4 diagonal cells, 45° out
+DIAG_V90 = [(-270, 90), (180, 90), (360, 270), (720, -90), (1170, -90)]   # 45° in, V90 right, 45° out
+
+
+def diagonal(hull):
+    out = {}
+    corridor = 2 * (P.CELL / 2 - P.WALL_T) / math.sqrt(2)
+    out["corridor"] = corridor
+    for th in (0.0, P.DIAG_HEADING_ERR):
+        g = affinity.rotate(hull, th, origin=(0, 0))
+        out[f"proj_{th:g}"] = g.bounds[3] - g.bounds[1]
+    obs = maze_for(DIAG_STRAIGHT)
+    poses = [q for q in fillet_path(DIAG_STRAIGHT, 75.0) if 360 < q[0] < 720]      # middle of the diagonal
+    out["straight_nom"] = clearance(hull, poses, obs)
+    out["straight_worst"] = worst_clearance(hull, poses, obs)
+    out["t45"] = [(r, clearance(hull, fillet_path(DIAG_STRAIGHT, r), obs),
+                   worst_clearance(hull, fillet_path(DIAG_STRAIGHT, r), obs)) for r in P.TURN45_R]
+    obs2 = maze_for(DIAG_V90)
+    out["v90"] = []
+    for r in P.V90_R:
+        poses = fillet_path_mixed(DIAG_V90, (60.0, r, 60.0))
+        out["v90"].append((r, clearance(hull, poses, obs2), worst_clearance(hull, poses, obs2)))
+    # IR rays while running the diagonal: distance to the first wall or post for each sensor
+    poses = [q for q in fillet_path(DIAG_STRAIGHT, 75.0) if 360 <= q[0] < 540]          # one 180 mm period
+    edge = obs.boundary
+    rays = {n: [] for (n, *_r) in P.SENSORS}
+    for (x, y, h) in poses[::2]:
+        for (n, sx, sy, yaw) in P.SENSORS:
+            ox, oy = x + sx * math.cos(h) - sy * math.sin(h), y + sx * math.sin(h) + sy * math.cos(h)
+            a = h + math.radians(yaw)
+            ray = LineString([(ox, oy), (ox + 400 * math.cos(a), oy + 400 * math.sin(a))])
+            hit = ray.intersection(edge)
+            rays[n].append(min(Point(ox, oy).distance(g) for g in getattr(hit, "geoms", [hit])) if not hit.is_empty else 999)
+    out["rays"] = {n: (min(v), max(v), sum(d <= P.IR_RANGE for d in v) / len(v)) for n, v in rays.items()}
+    return out
+
+
+def fillet_path_mixed(wps, radii, step=2.0):
+    """Like fillet_path, one radius per corner."""
+    poses, pts = [], [np.array(w, float) for w in wps]
+    # build corner by corner: reuse fillet_path on 3-point windows and stitch at segment midpoints
+    mids = [pts[0]] + [(pts[i] + pts[i + 1]) / 2 for i in range(1, len(pts) - 2)] + [pts[-1]]
+    for i in range(1, len(pts) - 1):
+        seg = fillet_path([mids[i - 1], pts[i], mids[i]], radii[i - 1], step)
+        poses += seg
+    return poses
+
+
+# ------------------------------------------------------------ crash and stiffness (Rev A.1)
+def crash(mass_g):
+    m = mass_g / 1000
+    rows = []
+    for v in P.CRASH_SPEEDS:
+        e = 0.5 * m * v * v
+        f = e / (P.BUMPER_STROKE / 1000)                  # mean force over the bumper stroke
+        rows.append((v, e, f, 4 * P.M2_SHEAR_N / f))      # 4 frame screws carry the plate
+    # axle as a cantilever from the outer bearing face to the tyre centre
+    L = (M.HUB_Y0 + M.HUB_Y1) / 2 - M.WALL_Y1
+    I = math.pi * P.AXLE_D ** 4 / 64
+    F = P.SHOCK_G * (mass_g + P.FAN_DOWNFORCE_G) / 1000 * G / 2
+    defl = F * L ** 3 / (3 * 193000 * I)                  # E = 193 GPa stainless
+    stress = F * L * (P.AXLE_D / 2) / I
+    return rows, dict(L=L, F=F, defl_um=defl * 1000, stress=stress)
+
+
 def export(parts):
     import shutil
     for d in ("step", "stl"):
@@ -142,6 +293,23 @@ def export(parts):
                         os.path.join(OUT, "step", "plate_outline.dxf"))
 
 
+def diagonal_figure(hull):
+    """Top view: the mouse footprint along a 45° entry, a V90 turn and a 45° exit."""
+    obs = maze_for(DIAG_V90)
+    fig, ax = R.plt.subplots(figsize=(9, 6))
+    for g in getattr(obs, "geoms", [obs]):
+        x, y = g.exterior.xy; ax.fill(x, y, fc="0.85", ec="crimson", lw=0.5)
+    poses = fillet_path_mixed(DIAG_V90, (60.0, 60.0, 60.0))
+    xs = [q[0] for q in poses]; ys = [q[1] for q in poses]
+    ax.plot(xs, ys, "k--", lw=0.6)
+    for q in poses[::14]:
+        g = affinity.translate(affinity.rotate(hull, q[2], origin=(0, 0), use_radians=True), q[0], q[1])
+        x, y = g.exterior.xy; ax.plot(x, y, c="tab:blue", lw=0.6)
+    ax.set_aspect("equal"); ax.set_xlim(-200, 1000); ax.set_ylim(-260, 420)
+    ax.set_title("Rev A.1 footprint (74 x 96.5 mm) through a 45° entry, a V90 turn (R 60) and a 45° exit", fontsize=9)
+    ax.set_xlabel("mm"); R.save(fig, os.path.join(ASSETS, "diagonal_clearance.png"))
+
+
 def renders(parts, sens):
     rd = ASSETS; os.makedirs(rd, exist_ok=True)
     meshes = {p.name: R.tessellate(p.shape) for p in parts}
@@ -156,19 +324,38 @@ def renders(parts, sens):
         fig, ax = R.plt.subplots(figsize=(8, 6)); R.draw(ax, ms(), az, el)
         ax.set_title(f"Micromouse Rev A, {fname.replace('_', ' ')}", fontsize=10); R.save(fig, f"{rd}/{fname}.png")
 
-    # exploded with labels
-    fig, ax = R.plt.subplots(figsize=(10, 8))
+    # exploded with labels: one label per part type, pushed radially out from the picture centre
+    fig, ax = R.plt.subplots(figsize=(11, 9))
     r, u, w = R.draw(ax, ms(True), 35, 25)
-    for p in parts:
-        if p.name.endswith("_R") or p.name in ("imu", "motor_driver", "fan_mosfet", "ir_receivers"):
-            continue                                  # label one side only
-        c = np.array(p.centroid()) + np.array(p.explode)
-        px, py = c @ r, c @ u
-        k = parts.index(p)
-        ax.annotate(p.name, (px, py), xytext=(px + 22 * (1 if k % 2 else -1) - (30 if k % 2 == 0 else 0), py + 8 + 4 * (k % 3)), fontsize=7,
+    skip = ("imu", "motor_driver", "fan_mosfet", "ir_receivers")
+    lab = [p for p in parts if not p.name.endswith("_R") and p.name not in skip]
+    pts = {p.name: np.array([(np.array(p.centroid()) + np.array(p.explode)) @ r,
+                             (np.array(p.centroid()) + np.array(p.explode)) @ u]) for p in lab}
+    ctr = np.mean(list(pts.values()), axis=0)
+    xl, yl = ax.get_xlim(), ax.get_ylim()
+    tx = {}
+    for p in lab:
+        q = pts[p.name]; d = q - ctr
+        tx[p.name] = q + d / (np.linalg.norm(d) + 1e-9) * 38
+    names = list(tx)
+    for _ in range(300):                                  # push overlapping labels apart
+        moved = False
+        for i, a in enumerate(names):
+            for b in names[i + 1:]:
+                dv = tx[a] - tx[b]
+                if abs(dv[0]) < 34 and abs(dv[1]) < 7:
+                    sgn = 1 if dv[1] >= 0 else -1
+                    tx[a][1] += 0.8 * sgn; tx[b][1] -= 0.8 * sgn; moved = True
+        if not moved:
+            break
+    for p in lab:
+        nm = p.name[:-2] + " x2" if p.name.endswith("_L") else p.name
+        ax.annotate(nm, pts[p.name], xytext=tx[p.name], fontsize=7, ha="center", va="center",
                     arrowprops=dict(arrowstyle="-", lw=0.5, color="0.3"),
                     bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="0.6", lw=0.4))
-    ax.set_title("Rev A exploded view", fontsize=10); R.save(fig, f"{rd}/exploded.png")
+    ax.set_xlim(xl[0] - 40, xl[1] + 40); ax.set_ylim(yl[0] - 20, yl[1] + 20)
+    ax.set_title("Rev A.1 exploded view (left-side parts labelled; right side is the mirror image)", fontsize=10)
+    R.save(fig, f"{rd}/exploded.png")
 
     # orthographic drawings with key dimensions
     def dim(ax, p1, p2, off, text, horiz=True):
@@ -297,6 +484,11 @@ def main():
             tire_clear.append((t, o, min_dist(byname[t], byname[o])))
     min_tire = min(tire_clear, key=lambda r: r[2])
     mass_ex_batt = mass - P.BATT_MASS
+    hull = footprint(parts)
+    dg = diagonal(hull)
+    v90_ok = [r for r, n, w in dg["v90"] if w >= P.DIAG_MIN_CLEAR]
+    t45_ok = all(w >= P.DIAG_MIN_CLEAR for r, n, w in dg["t45"])
+    crash_rows, beam = crash(mass)
 
     checks = [
         ("No unplanned part interference", len(real) == 0,
@@ -323,12 +515,27 @@ def main():
         ("Rear skid gap > 0.5 mm floor step rule", P.REAR_SKID_GAP > P.FLOOR_STEP_MAX, f"{P.REAR_SKID_GAP} mm"),
         ("Tyre clears every body part by ≥ 0.8 mm", min_tire[2] >= 0.8,
          f"closest {min_tire[0]} to {min_tire[1]}: {min_tire[2]:.2f} mm"),
+        (f"Diagonal straight: ≥ {P.DIAG_MIN_CLEAR:.0f} mm to every post with ±{P.DIAG_LATERAL_ERR:.0f} mm and ±{P.DIAG_HEADING_ERR:.0f}° error",
+         dg["straight_worst"] >= P.DIAG_MIN_CLEAR,
+         f'{dg["straight_worst"]:.1f} mm worst, {dg["straight_nom"]:.1f} mm centred (corridor {dg["corridor"]:.1f} mm)'),
+        (f"45° turn in and out clears by ≥ {P.DIAG_MIN_CLEAR:.0f} mm with errors, every radius checked", t45_ok,
+         ", ".join(f"R{r:.0f}: {w:.1f}" for r, n, w in dg["t45"])),
+        (f"V90 turn clears by ≥ {P.DIAG_MIN_CLEAR:.0f} mm with errors at R = 50 mm", 50.0 in v90_ok,
+         f"passes at R = {', '.join(f'{r:.0f}' for r in v90_ok) or 'none'} mm; keep firmware V90 radius ≤ {max(v90_ok or [0]):.0f} mm"),
+        (f"Diagonal IR (DL, DR) sees a wall or post within {P.IR_RANGE:.0f} mm [A] over ≥ 80 % of a diagonal",
+         all(dg["rays"][n][2] >= 0.8 for n in ("DL", "DR")),
+         ", ".join(f"{n} {lo:.0f}-{hi:.0f} mm, {fr:.0%} in range" for n, (lo, hi, fr) in dg["rays"].items() if n[0] == "D")),
+        ("Frontal crash at the stretch speed: 4 frame screws hold with ≥ 2x margin", crash_rows[-1][3] >= 2,
+         f"{crash_rows[-1][0]:.1f} m/s: {crash_rows[-1][2]:.0f} N mean, margin {crash_rows[-1][3]:.1f}x"),
+        ("Axle deflection at the tyre under a 10 g shock < 20 µm", beam["defl_um"] < 20,
+         f'{beam["defl_um"]:.1f} µm, {beam["stress"]:.0f} MPa'),
         ("All IR spots stay on the wall face (0-50 mm)", all(s["z_lo"] > 0 and s["z_hi"] < P.WALL_H for s in sens),
          ", ".join(f'{s["name"]} {s["z_lo"]:.0f}-{s["z_hi"]:.0f}' for s in sens)),
     ]
 
     export(parts)
     renders(parts, sens)
+    diagonal_figure(hull)
 
     with open(os.path.join(OUT, "build_report.md"), "w") as f:
         f.write("# Rev A build report (generated by cad_design/source/build.py, do not edit)\n\n")
@@ -365,6 +572,27 @@ def main():
             sd = (f"{s['side_dist']:.1f} mm, at x={s['side_hit_x']:.0f} (posts at x=±90)" if s["side_dist"] else "n/a")
             f.write(f"| {s['name']} | {s['x']:.1f}, {s['y']:.1f} | {s['yaw']:+.0f}° | {s['wall']} at x={s['hit'][0]:.0f} "
                     f"| {s['dist']:.1f} | {s['z_lo']:.1f} to {s['z_hi']:.1f} | {sd} |\n")
+        f.write("\n## Diagonal running (Rev A.1)\n\n"
+                f"- Corridor between post corners on a 45° staircase: {dg['corridor']:.1f} mm "
+                f"(= 2 x ({P.CELL:.0f}/2 - {P.WALL_T:.0f})/√2, from the APEC cell and post sizes)\n"
+                f"- Mouse width across the corridor: {dg['proj_0']:.1f} mm square-on, {dg[f'proj_{P.DIAG_HEADING_ERR:g}']:.1f} mm at {P.DIAG_HEADING_ERR:.0f}° heading error\n"
+                f"- Clearance on a diagonal straight: {dg['straight_nom']:.1f} mm per side centred; "
+                f"{dg['straight_worst']:.1f} mm with ±{P.DIAG_LATERAL_ERR:.0f} mm and ±{P.DIAG_HEADING_ERR:.0f}° [A] applied together\n\n"
+                "| Manoeuvre | Radius mm | Clearance centred mm | Clearance with errors mm |\n|---|---|---|---|\n")
+        for r, n, w in dg["t45"]:
+            f.write(f"| 45° in / out | {r:.0f} | {n:.1f} | {w:.1f} |\n")
+        for r, n, w in dg["v90"]:
+            f.write(f"| V90 (diagonal to diagonal) | {r:.0f} | {n:.1f} | {w:.1f} |\n")
+        f.write("\nIR on a diagonal straight (distance to the first wall or post over one 180 mm period):\n\n"
+                + "".join(f"- {n}: {lo:.0f} to {hi:.0f} mm, within {P.IR_RANGE:.0f} mm for {fr:.0%} of the period\n" if hi < 999 else
+                          f"- {n}: looks along the corridor, no wall within 400 mm until the diagonal ends (used for the end wall)\n"
+                          for n, (lo, hi, fr) in dg["rays"].items()))
+        f.write("\n## Crash and stiffness (Rev A.1)\n\n| Speed m/s | Energy J | Mean bumper force N | 4 x M2 shear margin |\n|---|---|---|---|\n")
+        for v, e, fo, mg in crash_rows:
+            f.write(f"| {v:.1f} | {e:.3f} | {fo:.0f} | {mg:.1f}x |\n")
+        f.write(f"\nBumper stroke {P.BUMPER_STROKE} mm [A]. Axle: {beam['L']:.1f} mm overhang from the outer bearing to the tyre centre, "
+                f"{beam['F']:.1f} N per wheel at {P.SHOCK_G:.0f} g [A] with the fan on: deflection {beam['defl_um']:.1f} µm, "
+                f"bending stress {beam['stress']:.0f} MPa (stainless yield ≈ 200+ MPa).\n")
         f.write("\n## Interference check\n\n")
         if not clashes:
             f.write("No overlapping solids.\n")

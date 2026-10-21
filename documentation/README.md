@@ -2,6 +2,7 @@
 
 | Document | What it covers |
 |---|---|
+| [build_guide.md](build_guide.md) | **How to build Rev A.1**: performance numbers, diagonal fit, BOM, print settings, assembly, wiring, first power-up, first tests |
 | [design_notes.md](design_notes.md) | Reference winners studied, the flaw each feature fixes, assumptions, print settings, assembly guide, Gate 4 status |
 | [../cad_design/build_report.md](../cad_design/build_report.md) | Generated check results, mass/CG table, fan and grip numbers, IR geometry |
 | [../research/phase1_research_brief.md](../research/phase1_research_brief.md) | Phase 1: top designs, IR vs ToF, MCU, 2WD vs 4WD, top student-build failures |

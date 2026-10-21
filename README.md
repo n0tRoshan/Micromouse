@@ -8,12 +8,13 @@ An autonomous maze-solving micromouse built by students of **VIT Chennai** for t
 
 | At a glance | Rev A (initial build) |
 |---|---|
-| Size and mass | 96.5 x 77 x 29.5 mm, 78 g with battery (63 g without) |
+| Size and mass | 96.5 x 74 x 29.5 mm, 78 g with battery (63 g without); fits the 110 mm diagonal corridor with 18 mm a side |
 | Drive | 2WD, 8520 coreless motors, 8T:36T 0.5M spur gears (4.5:1), 24 mm wheels on bearings |
 | Grip | Centre-line suction fan: 0716 coreless motor, 20 mm centrifugal impeller, skirt pan 1.3 mm off the floor |
 | Sensing | 4 pulsed IR pairs (SFH4550 / TEFT4300) at ±0° and ±50°; AS5047P wheel encoders; 6-axis IMU |
 | Brain and power | STM32F4, 2S 240 mAh LiPo |
-| Design checks | 16 of 16 pass ([build report](cad_design/build_report.md)) |
+| Design checks | 22 of 22 pass ([build report](cad_design/build_report.md)) |
+| Build it | [Build and assembly guide](documentation/build_guide.md) |
 
 ## Table of Contents
 
@@ -38,7 +39,7 @@ Three ideas set this design apart:
 
 1. **Copy the winners' architecture, then fix their flaws.** Every subsystem traces to a mouse that placed at APEC 2026, and each known failure of those mice maps to a specific feature in our CAD.
 2. **One rigid frame.** The skirt, bearing walls, motor tubes, encoder mounts, fan housing and skid domes are a single printed part. Both axle bores are cut in one operation, so the wheels are coaxial by construction.
-3. **The CAD checks itself.** The model is generated from one parameter file. Every rebuild re-runs 16 checks covering interference, footprint, centre of gravity, grip with and without the fan, skirt and gear floor clearance, and IR beam height, and fails loudly if one breaks.
+3. **The CAD checks itself.** The model is generated from one parameter file. Every rebuild re-runs 22 checks covering interference, footprint, diagonal-run clearance, centre of gravity, grip with and without the fan, skirt and gear floor clearance, crash loads and IR beam height, and fails loudly if one breaks.
 
 ## Project Workflow
 
@@ -50,7 +51,7 @@ The work runs in gated phases: a phase starts only when the previous gate passes
 | 1 Research | Winners' designs, rules, failure modes | **Done** ([brief](research/phase1_research_brief.md)) |
 | 2 Performance budget | Mass, speed, acceleration, torque, current | Next |
 | 3 Components | Scored part selection under budget | Next |
-| 4 CAD | Parametric model, checks, exports | **Rev A modelled**; physical fit test pending |
+| 4 CAD | Parametric model, checks, exports | **Rev A.1 modelled**, [build guide](documentation/build_guide.md) ready; physical fit test pending |
 | 5 Firmware | State machine, solver, motion, logger | [Plan](firmware/README.md) |
 | 6 Testing | Bench to full-maze rehearsal, numeric pass criteria | |
 | 7 Optimisation | Logged single-variable tuning | |
@@ -93,11 +94,13 @@ Part numbers, prices and suppliers are fixed in Phase 3. Values marked `[A]` in 
 | ![](assets/iso_below.png) | ![](assets/section_fan.png) |
 | **IR beams in a cell** | **Top view with dimensions** |
 | ![](assets/sensor_in_cell.png) | ![](assets/drawing_top.png) |
+| **Diagonal run: 45° entry, V90 turn, 45° exit** | **Side view** |
+| ![](assets/diagonal_clearance.png) | ![](assets/drawing_side.png) |
 
 **Open the full mouse in Fusion 360:** `cad_design/step/micromouse_revA_assembly.step`. Printable STLs are in `cad_design/stl/`. To rebuild after a change:
 
 ```bash
-python3 -m pip install cadquery matplotlib
+python3 -m pip install cadquery matplotlib shapely
 cd cad_design/source && python3 build.py
 ```
 

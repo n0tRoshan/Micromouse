@@ -1,6 +1,6 @@
 # Rev A (initial build): design notes
 
-Date: 2026-10-19 · Phase 4 (CAD) · Governing rules: APEC/IEEE classic micromouse, stricter value where they differ ([rules brief](../research/rules_brief.md))
+Date: 2026-10-19, updated 2026-10-21 (Rev A.1) · Phase 4 (CAD) · Governing rules: APEC/IEEE classic micromouse, stricter value where they differ ([rules brief](../research/rules_brief.md))
 Tags: **[C: source]** confirmed, **[A]** assumed, **[D]** design choice backed by the reasoning here.
 Generated numbers (mass, CG, clearances, checks) live in [`cad_design/build_report.md`](../cad_design/build_report.md). Rerun `cad_design/source/build.py` after any parameter change.
 
@@ -37,7 +37,12 @@ Rev A copies its architecture from the APEC 2026 winners. Nothing is carried ove
 | F11 | Fan off-axis loads the skids instead of the wheels | **Fan on the centre line**, 7 mm ahead of the axle. The skirt (suction pan) is the frame floor, and its centroid sits 2.9 mm ahead of the axle | `frame`, `impeller`, `fan_motor` | Build check; `assets/section_fan.png` |
 | F12 | Skirt dragging on 0.5 mm floor steps | Skirt 1.3 mm off the floor; worst pitch case still 0.66 mm. PTFE skid domes are moulded into the skirt | `SKIRT_*`, skids | Build check |
 | F13 | Extra mounts and placeholders add mass and failure points | **11 part types**, each with a job: frame, plate, sensor block, bumper, battery holder, impeller, hubs, plus bought parts. No separate motor mounts, skid posts, fan brackets or adapter boards: the MCU, IMU and drivers are chips on the PCB | all | Mass 63.3 g ex battery |
-| F14 | Oversized chassis hits walls (brief §5) | 96.5 x 77 mm, 45.5 mm per side in the passage; 61 mm swept radius turning in place | plate | Build check |
+| F14 | Oversized chassis hits walls (brief §5) | 96.5 x 74 mm, 47 mm per side in the passage; 60 mm swept radius turning in place | plate | Build check |
+| F15 | Diagonal runs pass between post corners only 110.3 mm apart (owner question 2026-10-21) | **Rev A.1:** plate narrowed to 35.5 mm half-width so plate + bumper sit inside the tyres; overall width 77 → 74 mm. Sweep checks on a diagonal straight, 45° in/out and V90 turns with ±5 mm and ±5° error | `PLATE_HALF_W`, `DIAG_*` | Build checks; `assets/diagonal_clearance.png` |
+| F16 | Axle end play and the spur rubbing the bearing outer race; magnet gap drifting with the axle (Rev A had a 2 mm float) | **Rev A.1:** inner spacer + e-clip and an outer 0.3 mm shim clamp both inner races, so the axle cannot float and the 1 mm magnet gap is fixed | `axle_hw_*` | Phase 6A end-play and AGC check |
+| F17 | A glued wheel can only come off by breaking the encoder magnet joint (fails the Gate 4 swap test) | **Rev A.1:** hub drives through a D-flat and is held by one M2 screw into the axle end; the wheel comes off with a hex key, the encoder side is untouched | `hub_*`, `axle_*`, `hub_screw_*` | Gate 4 swap test |
+| F18 | No route for motor and encoder wires: the motor tubes sit 0.2 mm under the PCB | **Rev A.1:** an 8 x 3 mm slot above each encoder board and a 3 x 10 mm slot at the tail for both motor leads; all wires stay inboard of the walls | `ENC_SLOT`, `MOTOR_SLOT` | Visual; assembly step 10 |
+| F19 | Frame and axle never checked against crash and drop loads (Phase 4 item) | **Rev A.1:** frontal crash at 2 m/s puts 155 N mean through the bumper, 22x under the shear strength of the 4 frame screws; axle bends 1.1 µm at 10 g | build checks | Phase 6J |
 
 ## 3. Assumptions
 
@@ -51,44 +56,28 @@ Rev A copies its architecture from the APEC 2026 winners. Nothing is carried ove
 | C6 | Shroud limits each IR cone to ±12° [A] | Spot heights | 6C |
 | C7 | FDM printer, 0.4 mm nozzle, PETG and TPU [A] | Print notes below | Phase 0 |
 | C8 | Gear motor and fan need 3 motor channels: DRV8835 (2) + a low-side MOSFET (fan) [A] | Electronics BOM | Phase 3 |
+| C9-C14 | 8520 stall current vs DRV8835 1.5 A, magnet field strength, bearing shield bore, diagonal heading error, IR range, average current | See [build_guide.md §10](build_guide.md#10-things-still-to-verify-assumptions-register-additions) | 6A-6I |
 
-## 4. Manufacturing notes (FDM)
+## 4. Manufacturing notes
 
-| Part | Material | Orientation | Notes |
-|---|---|---|---|
-| frame | PETG (PA-CF if available) | Skirt flat on the bed | 4 perimeters, 50 % gyroid. Ream both axle bores together with one 6 mm reamer passed through both walls. This keeps them coaxial. The skirt must come out flat because it sets the 1.3 mm floor gap |
-| hub_L/R | PETG | Outer face down | 100 % infill, 3 mm bore reamed, glue to the axle |
-| impeller | PETG or resin | Backplate down | Balance it on the motor before fitting |
-| sensor_block | Matte black PETG | Flat | Drill bores to 3.2 mm if they sag |
-| battery_holder | PETG | Flat | |
-| bumper | TPU 95A | Flat | |
-| plate | 1.0 mm FR4 PCB | | KiCad edge cut from `cad_design/step/plate_outline.dxf` |
-
-Heat-set M2 inserts go in the four wall tops; there are no threads in plastic.
+Moved to [build_guide.md](build_guide.md) §4 (print settings) and §5 (axle preparation).
 
 ## 5. Assembly guide
 
-1. Press the four M2 inserts into the frame's wall tops.
-2. Press two MR63 bearings into each wall bore. Slide each axle in from outside, then glue its magnet on the inner end.
-3. Glue a spur gear to each hub's inner face. Glue the hub onto the axle so the spur sits 0.3 mm off the wall, then fit the tyres between the lips.
-4. Press the pinions onto the drive-motor shafts. Slide each motor into its tube from the centre until the pinion meshes with the spur. Check that the gears turn with a little backlash.
-5. Fit the AS5047P boards on the ribs, chip facing the magnet with a 1 mm gap.
-6. Push the impeller onto the fan motor shaft, then drop the motor into the collar from above. The impeller hangs 0.5 mm over the skirt.
-7. Bolt the PCB onto the frame (4 x M2 x 4 into the inserts). The fan motor passes up through the PCB hole.
-8. Seat the 8 LEDs in the sensor block, emitters outboard, and fit it with 2 x M2. Clip the bumper on.
-9. Screw the battery holder down (2 x M2), slide the pack in from the left, and strap it.
+Moved to [build_guide.md](build_guide.md) §6, with the wiring (§7), first power-up (§8) and the order of first tests (§9).
 
 ## 6. Gate 4 status
 
 | Item | Status | Evidence |
 |---|---|---|
 | Interference check passes | **PASS** (CAD) | `build_report.md` |
-| Footprint and passage clearance in CAD | **PASS** | 96.5 x 77 mm, 45.5 mm per side |
+| Footprint and passage clearance in CAD | **PASS** | 96.5 x 74 mm, 47 mm per side; diagonal corridor 18.2 mm per side (10.0 mm with errors) |
 | Footprint on the physical prototype | **FAIL (not built yet)** | Needs a print |
-| CG within target | **PASS** (CAD, assumed masses) | +0.8 mm, 16.2 mm high |
+| CG within target | **PASS** (CAD, assumed masses) | +0.6 mm, 16.1 mm high |
 | First fit needs only minor trimming | **FAIL (not built yet)** | Print the frame first |
-| Serviceability by swapping battery, wheel, sensor | **FAIL (not built yet)** | Designed for it; needs a physical test |
-| Parametric model, STEP/STL, drawings, exploded view, assembly guide | **PASS** | `cad_design/`, `assets/`, §5 |
+| Serviceability by swapping battery, wheel, sensor | **FAIL (not built yet)** | Designed for it (Rev A.1 removable hub); swap table in build_guide.md §6 needs the physical test |
+| Parametric model, STEP/STL, drawings, exploded view, assembly guide | **PASS** | `cad_design/`, `assets/`, [build_guide.md](build_guide.md) |
+| Drop and crash loads checked | **PASS** (calculation) | build report, crash and stiffness section |
 
 ## 7. Why the fan is in the initial build
 

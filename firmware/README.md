@@ -20,3 +20,12 @@ Target: STM32F4 on the main PCB. This file records the plan the hardware was des
 | Run logger: per-cell, timestamped, over UART | |
 
 The solver is simulated off-robot on many mazes before it runs on the mouse.
+
+## Constraints from the CAD (Rev A.1)
+
+| Item | Value | Source |
+|---|---|---|
+| Encoder | AS5047P ABI into TIM2 / TIM5 encoder mode, 4096 counts per wheel rev = 0.0184 mm per count; SPI2 for AGC and magnet diagnostics at boot | [build guide §1, §7](../documentation/build_guide.md) |
+| Drive duty cap | `D_max = 1.5 A x R_measured / V_batt` until Phase 3 confirms the driver | build guide §1 |
+| Fan duty cap | average fan voltage at or below the 0716's rating; fan off in FAULT and between runs | build guide §1 |
+| Diagonals | V90 turn radius ≤ 75 mm; heading error on a diagonal > 5° is a fault condition | [build report](../cad_design/build_report.md), diagonal section |
