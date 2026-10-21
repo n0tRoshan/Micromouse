@@ -13,6 +13,15 @@ Every value carries a tag: [C: source] confirmed, [A] assumed (re-check when the
 Phase 2/3 fixes it), [D] design choice (see docs/design_notes.md).
 """
 
+import os
+
+# ---------------------------------------------------------------- variant switch
+# Owner decision 2026-10-21: the initial build runs WITHOUT the suction fan until test results justify it.
+# FAN = False drops the fan motor, impeller, fan housing, inlet and fan MOSFET, raises the floor plate
+# (no suction pan to keep low) and writes everything to cad_design/no_fan/. FAN = True is the full Rev A.1.
+# Select with the environment variable MM_FAN=0 / MM_FAN=1, or `python3 build.py --no-fan`.
+FAN = os.environ.get("MM_FAN", "1") != "0"   # [D]
+
 # ---------------------------------------------------------------- maze (rules)
 CELL = 180.0              # [C: APEC rules I.1, IEEE R2] cell pitch
 WALL_T = 12.0             # [C: APEC rules I.1] wall thickness
@@ -95,7 +104,7 @@ IMPELLER_HUB_D = 3.5      # [D]
 HOUSING_ID = 22.0         # [D] 1 mm tip clearance
 HOUSING_WALL = 1.2        # [D]
 INLET_D = 11.0            # [D]
-SKIRT_GAP = 1.3           # [D] skirt underside to floor; keeps > 0.6 mm when the tail drops onto its skid
+SKIRT_GAP = 1.3 if FAN else 3.0  # [D] floor-plate underside to floor. Fan: 1.3 mm suction pan. No fan: 3.0 mm, clear of floor steps and debris
 SKIRT_T = 1.0             # [D]
 SKIRT_X = (-36.0, 42.0)   # [D] the skirt is the frame floor and carries both skids
 SKIRT_HALF_Y = 25.0       # [D] inside the spur gears
@@ -127,7 +136,7 @@ IR_HALF_ANGLE = 12.0      # [A] shroud-limited cone
 # ---------------------------------------------------------------- battery (2S LiPo) on the plate, behind the fan motor
 BATT = (18.0, 44.0, 11.0) # [A] 2S 240 mAh (Decimus-5A uses 2S 240 mAh 25C): x, y, z
 BATT_MASS = 15.0          # [A]
-BATT_CX = -18.0           # [D] tuned so the CG lands 0-6 mm ahead of the axle
+BATT_CX = -18.0 if FAN else -16.0  # [D] tuned so the CG lands 0-6 mm ahead of the axle; fan-free moves 2 mm forward to replace the fan mass
 HOLDER_WALL = 1.2         # [D]
 HOLDER_FIT = 0.4          # [D]
 HOLDER_H = 5.0            # [D] rail height; a strap or tape goes over the top
@@ -140,6 +149,8 @@ CHIPS = [
     ("motor_driver", 3.0, 3.0, 1.0, -3.0, 10.0, 0.05),  # [A] DRV8835 (Decimus-5A)
     ("fan_mosfet", 3.0, 3.0, 1.0, -3.0, -10.0, 0.05),   # [A] low-side MOSFET for the fan
 ]
+if not FAN:
+    CHIPS = [c for c in CHIPS if c[0] != "fan_mosfet"]   # leave the footprint on the PCB, unpopulated
 COMPONENTS_MASS = 3.0     # [A] passives, regulator, connectors on the PCB, lumped
 MISC_MASS = 3.0           # [A] wiring, screws, inserts
 

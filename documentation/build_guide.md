@@ -4,11 +4,49 @@ Date: 2026-10-21 · Phases 2-6 hand-off for the initial build · Rules: APEC/IEE
 
 Tags: **[C: source]** confirmed, **[A]** assumed (measure or verify before relying on it), **[D]** design choice (reasoning in [design_notes.md](design_notes.md)). **Prices and stock are unverified**: every supplier column below is a place to check, not a quote. Fill in price, stock and lead time when you order (Phase 3).
 
-Model: `cad_design/step/micromouse_revA_assembly.step` (open in Fusion 360). Generated numbers: [`cad_design/build_report.md`](../cad_design/build_report.md), 22 of 22 checks pass.
+Models: **fan-free initial build** `cad_design/no_fan/step/micromouse_revA1_nofan_assembly.step` (21 of 21 checks, [report](../cad_design/no_fan/build_report.md)); full version with the fan `cad_design/step/micromouse_revA_assembly.step` (22 of 22 checks, [report](../cad_design/build_report.md)). Both open in Fusion 360. Sections 1-10 describe the fan version; section 0 lists what to change for the fan-free build.
 
 | | |
 |:---:|:---:|
 | ![](../assets/iso_front_left.png) | ![](../assets/exploded.png) |
+
+---
+
+## 0. Build the fan-free variant first
+
+Owner decision (2026-10-21): the first mouse runs **without the suction fan** until test results justify adding it. The fan version stays in the model, and one switch in `cad_design/source/params.py` (`FAN`) selects the variant:
+
+```bash
+cd cad_design/source
+python3 build.py --no-fan   # fan-free: writes cad_design/no_fan/ (step, stl, assets, build_report.md)
+python3 build.py            # full Rev A.1 with the fan: writes cad_design/step, stl, ../assets
+```
+
+**Fan-free files:** open `cad_design/no_fan/step/micromouse_revA1_nofan_assembly.step` in Fusion and print from `cad_design/no_fan/stl/`. The frame, plate and battery holder differ from the fan version. Hubs, bumper and sensor block are the same. Generated numbers: [`cad_design/no_fan/build_report.md`](../cad_design/no_fan/build_report.md), 21 of 21 checks pass. The fan-downforce check does not apply.
+
+| What changes | Fan-free | Fan version | Why |
+|---|---|---|---|
+| Fan motor, impeller, fan housing, inlet, exhaust windows, collar | removed | fitted | |
+| Floor plate (skirt) gap to the floor | **3.0 mm** | 1.3 mm | No suction pan to keep low, so it sits clear of floor steps and dust. Worst case at full pitch: 2.36 mm (fan: 0.66 mm) |
+| Skid domes | same positions, taller (2.7 mm front, 2.4 mm rear) | 1.0 / 0.7 mm | They still set the 0.3 / 0.6 mm skid gaps |
+| PCB | no fan hole; battery-holder holes 2 mm forward | fan hole | Same board outline. Keep the fan MOSFET footprint unpopulated so the fan can be added later without a new board |
+| Battery position | x = -16 mm | x = -18 mm | Moved 2 mm forward to replace the fan's mass ahead of the axle |
+| Mass | **73.2 g** (58.2 g without battery) | 77.7 g | [A] bought-part masses |
+| CG | +0.7 mm ahead of the axle, 16.5 mm high | +0.6 mm, 16.1 mm | Check: 0-6 mm ahead, PASS |
+| Grip limit (μ = 1.0 [A]) | 6.8 m/s² braking and accelerating ≥ 4 m/s² target | 19.4 / 20.7 m/s² with fan | Phase 2 start target is met without the fan |
+| Torque per motor at 4 m/s² | 0.0732 x 4 x 0.012 / 2 / (4.5 x 0.85) = **0.46 mN·m** | 0.49 mN·m | |
+| Runtime per charge | 192 mAh / 1.15 A [A] ≈ **10 min of running** | ≈ 6.6 min | No 0.6 A fan load |
+| Diagonal fit, sensors, crash, axle checks | identical | identical | Same 74 x 96.5 mm footprint |
+
+Pitch note: with the CG this close to the axle, the mouse rocks from the front skid onto the rear skid under almost any forward acceleration (above 0.4 m/s²) and back onto the front skid when braking. The total pitch is 0.70°, which moves an IR spot 1.2 mm at 100 mm. That is harmless, but if the logs show the rear skid dragging, move the battery forward in `params.py` (each 1 mm moves the CG about 0.2 mm).
+
+When following the rest of this guide for the fan-free build, skip:
+- BOM items 11 (fan motor) and 17 (fan MOSFET: leave the footprint empty), and the printed impeller.
+- Assembly step 9 (fan). In step 11 there is no fan motor to pass through the PCB.
+- The fan row in the wiring table (leave PB0 unconnected), power-up step 9, and the fan scale test in stage A.
+- The "fan on" repeat in test stages F and G.
+
+When results justify the fan, build the fan version's frame, plate and battery holder, fit the fan parts, and repeat test stages A, B and D-G with the fan on (one variable per test).
 
 ---
 

@@ -8,7 +8,8 @@ The whole mouse is generated from one parameter file. Change a number, rebuild, 
 | `source/micromouse.py` | Part geometry |
 | `source/build.py` | Runs the 22 design checks, exports STEP/STL/DXF, renders views into `../assets/`, writes `build_report.md` |
 | `source/render.py` | Headless renderer for the images |
-| `step/micromouse_revA_assembly.step` | **Full assembly: open this in Fusion 360** |
+| `no_fan/` | **Fan-free initial build** (`python3 build.py --no-fan`): its own STEP, STL, drawings and build report |
+| `step/micromouse_revA_assembly.step` | Full assembly with the suction fan: open in Fusion 360 |
 | `step/*.step` | One STEP per part; `plate_outline.dxf` for the KiCad board outline |
 | `stl/` | Printable parts: frame, hubs, impeller, sensor block, battery holder, bumper (plate STL is for fit checks) |
 | `build_report.md` | Generated: check results, mass and CG table, fan, grip, IR geometry, diagonal clearance, crash loads, clearances |

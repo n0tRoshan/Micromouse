@@ -198,7 +198,9 @@ def frame():
     walls = _box(wx0, wx1, WALL_Y0, WALL_Y1, SKIRT_Z0, PLATE_Z0)
     tube = _ycyl(2 * TUBE_R, MOTOR_Y0, WALL_Y0 + 0.01, x=MOTOR_X)
     rib = _box(-P.ENC_BOARD[0] / 2 - 1, P.ENC_BOARD[0] / 2 + 1, RIB_Y0, ENC_BOARD_Y0, SKIRT_Z1, PLATE_Z0)
-    f = f.union(_both(walls)).union(_both(tube)).union(_both(rib)).union(fan_housing_solid())
+    f = f.union(_both(walls)).union(_both(tube)).union(_both(rib))
+    if P.FAN:
+        f = f.union(fan_housing_solid())
     # skid domes under the skirt
     for (sx, gap) in ((P.FRONT_SKID_X, P.FRONT_SKID_GAP), (P.REAR_SKID_X, P.REAR_SKID_GAP)):
         r = P.SKID_D / 2
@@ -212,6 +214,8 @@ def frame():
     f = f.cut(_both(_ycyl(1.6, MOTOR_Y1 - 0.1, WALL_Y1 + 1, x=MOTOR_X)))
     # clamp slit along the top of each motor tube
     f = f.cut(_both(_box(MOTOR_X - 0.5, MOTOR_X + 0.5, MOTOR_Y0 - 1, WALL_Y0 - 0.5, AXLE_Z, PLATE_Z0 + 1)))
+    if not P.FAN:
+        return _insert_holes(f)
     # fan: chamber, inlet through the skirt, shaft hole in the cover, exhaust windows
     c = P.FAN_CENTER_X
     od = P.HOUSING_ID + 2 * P.HOUSING_WALL
@@ -229,6 +233,10 @@ def frame():
         win = (_box(od / 2 - 2.5, od / 2 + 1, -4.5, 4.5, SKIRT_Z1 + 0.6, CHAMBER_TOP - 0.4)
                .rotate((0, 0, 0), (0, 0, 1), ang).translate((c, 0, 0)))
         f = f.cut(win)
+    return _insert_holes(f)
+
+
+def _insert_holes(f):
     # M2 heat-set insert holes in the wall tops
     for x in P.FRAME_SCREWS_X:
         for s in (1, -1):
@@ -288,6 +296,8 @@ def plate():
     p = p.cut(_both(_box(-sx / 2, sx / 2, ey - sy / 2, ey + sy / 2, PLATE_Z0 - 1, PLATE_Z1 + 1).edges("|Z").fillet(1.0)))
     mx, my, mcx = P.MOTOR_SLOT
     p = p.cut(_box(mcx - mx / 2, mcx + mx / 2, -my / 2, my / 2, PLATE_Z0 - 1, PLATE_Z1 + 1).edges("|Z").fillet(1.0))
+    if not P.FAN:
+        return p
     return p.cut(_zcyl(P.FAN_MOTOR_D + 0.4, PLATE_Z0 - 1, PLATE_Z1 + 1, x=P.FAN_CENTER_X))
 
 
@@ -413,6 +423,8 @@ def build_parts():
         Part("bumper", bumper(), (0.90, 0.20, 0.20), "TPU 95A, printed", density=P.TPU_DENSITY, printable=True,
              explode=(25, 0, 10)),
     ]
+    if not P.FAN:
+        parts = [p for p in parts if p.name not in ("impeller", "fan_motor")]
     for spec in P.CHIPS:
         parts.append(Part(spec[0], chip(spec), (0.08, 0.08, 0.08), "IC on PCB", mass=spec[6], explode=(0, 0, 35)))
     return parts

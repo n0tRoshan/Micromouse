@@ -15,6 +15,7 @@ An autonomous maze-solving micromouse built by students of **VIT Chennai** for t
 | Brain and power | STM32F4, 2S 240 mAh LiPo |
 | Design checks | 22 of 22 pass ([build report](cad_design/build_report.md)) |
 | Build it | [Build and assembly guide](documentation/build_guide.md) |
+| Initial build | Fan-free variant first ([CAD](cad_design/no_fan/), 73 g); the fan version stays in the model for later |
 
 ## Table of Contents
 

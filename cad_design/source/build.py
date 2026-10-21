@@ -1,11 +1,15 @@
 """Build Rev A: run checks, export STEP/STL/DXF, render views into assets/, write build_report.md.
 
-Usage:  python3 build.py            (from cad/src)
+Usage:  python3 build.py            (from cad_design/source) full Rev A.1 with the suction fan
+        python3 build.py --no-fan   fan-free variant, written to cad_design/no_fan/
 """
 import itertools
 import math
 import os
 import sys
+
+if "--no-fan" in sys.argv:
+    os.environ["MM_FAN"] = "0"
 
 import numpy as np
 import cadquery as cq
@@ -20,8 +24,15 @@ import micromouse as M
 import render as R
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.normpath(os.path.join(HERE, ".."))                 # cad_design/
-ASSETS = os.path.normpath(os.path.join(HERE, "..", "..", "assets"))
+if P.FAN:
+    OUT = os.path.normpath(os.path.join(HERE, ".."))                 # cad_design/
+    ASSETS = os.path.normpath(os.path.join(HERE, "..", "..", "assets"))
+    VARIANT, ASM_NAME = "Rev A.1 (with suction fan)", "micromouse_revA_assembly"
+else:
+    OUT = os.path.normpath(os.path.join(HERE, "..", "no_fan"))       # cad_design/no_fan/
+    ASSETS = os.path.join(OUT, "assets")
+    VARIANT, ASM_NAME = "Rev A.1 fan-free (initial build)", "micromouse_revA1_nofan_assembly"
+DOWNFORCE_G = P.FAN_DOWNFORCE_G if P.FAN else 0.0
 G = 9.81
 MU_TIRE = 1.0      # [A] silicone on painted wood; Phase 6 measures it (tilt test)
 
@@ -107,7 +118,7 @@ def dynamics(m_g, cg, fan_g=0.0):
     fan_g: suction downforce in gram-force, acting at the skirt area centroid."""
     xc, _, h = cg
     xf, xr = P.FRONT_SKID_X, P.REAR_SKID_X
-    _, xd = skirt_area_centroid()
+    xd = skirt_area_centroid()[1] if P.FAN else 0.0
     f = fan_g / m_g                       # downforce as a fraction of weight
     res = {"xd": xd, "f": f}
     res["rests_on"] = "front skid" if xc > 0 else "rear skid"
@@ -267,7 +278,7 @@ def crash(mass_g):
     # axle as a cantilever from the outer bearing face to the tyre centre
     L = (M.HUB_Y0 + M.HUB_Y1) / 2 - M.WALL_Y1
     I = math.pi * P.AXLE_D ** 4 / 64
-    F = P.SHOCK_G * (mass_g + P.FAN_DOWNFORCE_G) / 1000 * G / 2
+    F = P.SHOCK_G * (mass_g + DOWNFORCE_G) / 1000 * G / 2
     defl = F * L ** 3 / (3 * 193000 * I)                  # E = 193 GPa stainless
     stress = F * L * (P.AXLE_D / 2) / I
     return rows, dict(L=L, F=F, defl_um=defl * 1000, stress=stress)
@@ -279,10 +290,10 @@ def export(parts):
         shutil.rmtree(os.path.join(OUT, d), ignore_errors=True)
     os.makedirs(os.path.join(OUT, "step"), exist_ok=True)
     os.makedirs(os.path.join(OUT, "stl"), exist_ok=True)
-    asm = cq.Assembly(name="micromouse_revA")
+    asm = cq.Assembly(name=ASM_NAME.replace("_assembly", ""))
     for p in parts:
         asm.add(p.shape, name=p.name, color=cq.Color(*p.color))
-    asm.save(os.path.join(OUT, "step", "micromouse_revA_assembly.step"))
+    asm.save(os.path.join(OUT, "step", f"{ASM_NAME}.step"))
     for p in parts:
         cq.exporters.export(p.shape, os.path.join(OUT, "step", f"{p.name}.step"))
         if p.printable or p.name == "plate":
@@ -322,7 +333,7 @@ def renders(parts, sens):
     # iso views
     for fname, az, el in (("iso_front_left", 35, 28), ("iso_rear_right", 215, 28), ("iso_below", 30, -35)):
         fig, ax = R.plt.subplots(figsize=(8, 6)); R.draw(ax, ms(), az, el)
-        ax.set_title(f"Micromouse Rev A, {fname.replace('_', ' ')}", fontsize=10); R.save(fig, f"{rd}/{fname}.png")
+        ax.set_title(f"Micromouse {VARIANT}, {fname.replace('_', ' ')}", fontsize=10); R.save(fig, f"{rd}/{fname}.png")
 
     # exploded with labels: one label per part type, pushed radially out from the picture centre
     fig, ax = R.plt.subplots(figsize=(11, 9))
@@ -416,14 +427,20 @@ def renders(parts, sens):
             pass
     fig, ax = R.plt.subplots(figsize=(9, 4.2)); R.draw(ax, sec, 90, 0)
     ax.axhline(0, c="k", lw=0.6)
-    ax.annotate("impeller", (-P.FAN_CENTER_X, M.SKIRT_Z1 + 3), xytext=(-P.FAN_CENTER_X - 30, -12), fontsize=7,
-                arrowprops=dict(arrowstyle="-", lw=0.5))
-    ax.annotate("skirt (suction pan)", (20, M.SKIRT_Z0), xytext=(15, -12), fontsize=7, arrowprops=dict(arrowstyle="-", lw=0.5))
-    ax.annotate("fan motor", (-P.FAN_CENTER_X, 28), xytext=(-P.FAN_CENTER_X - 25, 42), fontsize=7,
-                arrowprops=dict(arrowstyle="-", lw=0.5))
+    if P.FAN:
+        ax.annotate("impeller", (-P.FAN_CENTER_X, M.SKIRT_Z1 + 3), xytext=(-P.FAN_CENTER_X - 30, -12), fontsize=7,
+                    arrowprops=dict(arrowstyle="-", lw=0.5))
+        ax.annotate("skirt (suction pan)", (20, M.SKIRT_Z0), xytext=(15, -12), fontsize=7, arrowprops=dict(arrowstyle="-", lw=0.5))
+        ax.annotate("fan motor", (-P.FAN_CENTER_X, 28), xytext=(-P.FAN_CENTER_X - 25, 42), fontsize=7,
+                    arrowprops=dict(arrowstyle="-", lw=0.5))
+        title = "Section on the centre line (front to the left): fan, skirt and frame"
+    else:
+        ax.annotate(f"floor plate, {P.SKIRT_GAP} mm off the floor", (20, M.SKIRT_Z0), xytext=(15, -12), fontsize=7,
+                    arrowprops=dict(arrowstyle="-", lw=0.5))
+        title = "Section on the centre line (front to the left): fan-free frame"
     ax.set_ylim(-16, 46)
-    ax.set_title("Section on the centre line (front to the left): fan, skirt and frame", fontsize=10)
-    R.save(fig, f"{rd}/section_fan.png")
+    ax.set_title(title, fontsize=10)
+    R.save(fig, f"{rd}/{'section_fan' if P.FAN else 'section_centre'}.png")
 
     # sensor geometry in a cell
     fig, ax = R.plt.subplots(figsize=(7, 7)); R.draw(ax, ms(), -90, 90)
@@ -463,9 +480,9 @@ def main():
     rows, mass, cg = mass_table(parts)
     sens = sensor_geometry()
     dyn0 = dynamics(mass, cg, 0.0)
-    dyn = dynamics(mass, cg, P.FAN_DOWNFORCE_G)
-    skirt_A, skirt_xc = skirt_area_centroid()
-    dp_needed = P.FAN_DOWNFORCE_G / 1000 * G / (skirt_A * 1e-6)
+    dyn = dynamics(mass, cg, DOWNFORCE_G)
+    skirt_A, skirt_xc = skirt_area_centroid() if P.FAN else (0.0, 0.0)
+    dp_needed = DOWNFORCE_G / 1000 * G / (skirt_A * 1e-6) if P.FAN else 0.0
     skirt_min = min(dyn["skirt_gap_nose_down"], dyn["skirt_gap_tail_down"])
     allb = np.array([bbox(p.shape) for p in parts])
     xmin, ymin, zmin = allb[:, :3].min(axis=0); xmax, ymax, zmax = allb[:, 3:].max(axis=0)
@@ -504,10 +521,10 @@ def main():
         ("CG centred laterally (|y| ≤ 1 mm)", abs(cg[1]) <= 1, f"y = {cg[1]:+.2f} mm"),
         ("CG low (z ≤ wheel diameter)", cg[2] <= P.WHEEL_D, f"z = {cg[2]:.1f} mm"),
         ("Braking grip limit ≥ 4 m/s² target, fan off", dyn0["brake_grip_limit"] >= 4,
-         f'{dyn0["brake_grip_limit"]:.1f} m/s² (fan on, {P.FAN_DOWNFORCE_G:.0f} gf [A]: {dyn["brake_grip_limit"]:.1f} m/s²)'),
+         f'{dyn0["brake_grip_limit"]:.1f} m/s²' + (f' (fan on, {P.FAN_DOWNFORCE_G:.0f} gf [A]: {dyn["brake_grip_limit"]:.1f} m/s²)' if P.FAN else '')),
         ("Fan downforce acts within 10 mm of the axle (loads the wheels, not the skids)", abs(skirt_xc) <= 10,
          f"skirt centroid x = {skirt_xc:+.1f} mm"),
-        ("Skirt clears the floor by > 0.5 mm step at both pitch extremes", skirt_min > P.FLOOR_STEP_MAX,
+        ("Floor plate (skirt) clears the floor by > 0.5 mm step at both pitch extremes", skirt_min > P.FLOOR_STEP_MAX,
          f'nose down {dyn["skirt_gap_nose_down"]:.2f} mm, tail down {dyn["skirt_gap_tail_down"]:.2f} mm'),
         ("Body ground clearance ≥ 3 mm above the skirt line (floor steps ≤ 0.5 mm)", clear_floor >= 3,
          f"min {clear_floor:.1f} mm"),
@@ -532,13 +549,15 @@ def main():
         ("All IR spots stay on the wall face (0-50 mm)", all(s["z_lo"] > 0 and s["z_hi"] < P.WALL_H for s in sens),
          ", ".join(f'{s["name"]} {s["z_lo"]:.0f}-{s["z_hi"]:.0f}' for s in sens)),
     ]
+    if not P.FAN:
+        checks = [c for c in checks if not c[0].startswith("Fan downforce")]
 
     export(parts)
     renders(parts, sens)
     diagonal_figure(hull)
 
     with open(os.path.join(OUT, "build_report.md"), "w") as f:
-        f.write("# Rev A build report (generated by cad_design/source/build.py, do not edit)\n\n")
+        f.write(f"# {VARIANT} build report (generated by cad_design/source/build.py{'' if P.FAN else ' --no-fan'}, do not edit)\n\n")
         f.write("## Checks\n\n| Check | Result | Value |\n|---|---|---|\n")
         for n, ok, v in checks:
             f.write(f"| {n} | {'PASS' if ok else 'FAIL'} | {v} |\n")
@@ -551,20 +570,24 @@ def main():
             f.write(f"| {n} | {mat} | {g:.2f} | {c[0]:.1f} | {c[1]:.1f} | {c[2]:.1f} |\n")
         f.write(f"| **Total** | | **{mass:.1f}** | **{cg[0]:+.1f}** | **{cg[1]:+.2f}** | **{cg[2]:.1f}** |\n")
         f.write("\nMasses of bought parts and the 85 % print fill are [A] until weighed (Phase 6A).\n")
-        f.write("\n## Pitch and grip, fan on (quasi-static, tyre μ = 1.0 [A])\n\n")
+        f.write(f"\n## Pitch and grip, {'fan on' if P.FAN else 'no fan'} (quasi-static, tyre μ = 1.0 [A])\n\n")
         f.write(f"- Rests on: {dyn['rests_on']}\n- Nose lifts onto the rear skid above "
                 f"{dyn['nose_lift_accel']:.1f} m/s² forward acceleration (harmless, 2-skid rocking)\n"
                 f"- Braking grip limit with load transfer to the front skid: {dyn['brake_grip_limit']:.1f} m/s²\n"
                 f"- Acceleration grip limit on the rear skid: {dyn['accel_grip_limit']:.1f} m/s²\n"
                 f"- Total pitch range between skids: {dyn['pitch_range_deg']:.2f}°, "
                 f"moves an IR spot {dyn['beam_shift_100mm']:.1f} mm at 100 mm\n")
-        f.write(f"\n## Suction fan\n\n"
-                f"- 0716 coreless [A] driving a {P.IMPELLER_D:.0f} mm, {P.IMPELLER_BLADES}-blade centrifugal impeller at x = {P.FAN_CENTER_X:.0f} mm\n"
-                f"- Skirt (suction pan) area {skirt_A:.0f} mm², centroid x = {skirt_xc:+.1f} mm, {P.SKIRT_GAP} mm off the floor\n"
-                f"- Design downforce {P.FAN_DOWNFORCE_G:.0f} gf [A] = {dyn['f']:.2f}x robot weight; needs {dp_needed:.0f} Pa under the pan\n"
-                f"- Grip with fan: braking {dyn['brake_grip_limit']:.1f} m/s², accelerating {dyn['accel_grip_limit']:.1f} m/s² "
-                f"(fan off: {dyn0['brake_grip_limit']:.1f} / {dyn0['accel_grip_limit']:.1f})\n"
-                f"- Fan current {P.FAN_CURRENT_A} A [A], needs its own low-side MOSFET channel (the dual H-bridge is used by the wheels)\n")
+        if P.FAN:
+            f.write(f"\n## Suction fan\n\n"
+                    f"- 0716 coreless [A] driving a {P.IMPELLER_D:.0f} mm, {P.IMPELLER_BLADES}-blade centrifugal impeller at x = {P.FAN_CENTER_X:.0f} mm\n"
+                    f"- Skirt (suction pan) area {skirt_A:.0f} mm², centroid x = {skirt_xc:+.1f} mm, {P.SKIRT_GAP} mm off the floor\n"
+                    f"- Design downforce {P.FAN_DOWNFORCE_G:.0f} gf [A] = {dyn['f']:.2f}x robot weight; needs {dp_needed:.0f} Pa under the pan\n"
+                    f"- Grip with fan: braking {dyn['brake_grip_limit']:.1f} m/s², accelerating {dyn['accel_grip_limit']:.1f} m/s² "
+                    f"(fan off: {dyn0['brake_grip_limit']:.1f} / {dyn0['accel_grip_limit']:.1f})\n"
+                    f"- Fan current {P.FAN_CURRENT_A} A [A], needs its own low-side MOSFET channel (the dual H-bridge is used by the wheels)\n")
+        else:
+            f.write("\n## Suction fan\n\nNot fitted in this variant (owner decision 2026-10-21). The PCB keeps the fan MOSFET footprint unpopulated; "
+                    "build with `python3 build.py` (no flag) for the fan version.\n")
         f.write("\n## IR geometry (mouse centred in a cell, walls on three sides)\n\n"
                 "| Sensor | Mouth x, y | Yaw | Hits | Distance mm | Spot z range mm | No front wall: side wall hit |\n"
                 "|---|---|---|---|---|---|---|\n")
@@ -591,7 +614,7 @@ def main():
         for v, e, fo, mg in crash_rows:
             f.write(f"| {v:.1f} | {e:.3f} | {fo:.0f} | {mg:.1f}x |\n")
         f.write(f"\nBumper stroke {P.BUMPER_STROKE} mm [A]. Axle: {beam['L']:.1f} mm overhang from the outer bearing to the tyre centre, "
-                f"{beam['F']:.1f} N per wheel at {P.SHOCK_G:.0f} g [A] with the fan on: deflection {beam['defl_um']:.1f} µm, "
+                f"{beam['F']:.1f} N per wheel at {P.SHOCK_G:.0f} g [A]{' with the fan on' if P.FAN else ''}: deflection {beam['defl_um']:.1f} µm, "
                 f"bending stress {beam['stress']:.0f} MPa (stainless yield ≈ 200+ MPa).\n")
         f.write("\n## Interference check\n\n")
         if not clashes:

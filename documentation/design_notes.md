@@ -79,7 +79,11 @@ Moved to [build_guide.md](build_guide.md) §6, with the wiring (§7), first powe
 | Parametric model, STEP/STL, drawings, exploded view, assembly guide | **PASS** | `cad_design/`, `assets/`, [build_guide.md](build_guide.md) |
 | Drop and crash loads checked | **PASS** (calculation) | build report, crash and stiffness section |
 
-## 7. Why the fan is in the initial build
+## 7. Fan: modelled, but the first build runs without it
+
+Update 2026-10-21: the owner decided the first mouse runs fan-free until real results exist. `params.FAN` switches the model; the fan-free variant (`cad_design/no_fan/`) raises the floor plate to 3.0 mm and moves the battery 2 mm forward. Original reasoning for designing the fan in from the start:
+
+### Why the fan is designed in
 
 The Phase 1 brief recommended proving reliability without a fan first. The owner chose to build it in from the start (2026-10-19): APEC/IEEE rules allow fans, and every APEC 2026 top-3 mouse used one. In testing, the speed stages run fan-off first, then repeat with the fan on, so each change is still one variable.
 
